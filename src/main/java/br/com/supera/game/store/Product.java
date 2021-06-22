@@ -20,11 +20,11 @@ public class Product {
 
 	public String image;
 
-	public Product(int id, String name, Double price, int score, String image) {
+	public Product(int id, String name, BigDecimal price, short score, String image) {
 		this.id = id;
 		this.name = name;
-		this.price = new BigDecimal(price);
-		this.score = (short) score;
+		this.price = price;
+		this.score = score;
 		this.image = image;
 	}
 }

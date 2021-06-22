@@ -7,8 +7,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class Main {
 
     public static void main(String[] args) {
-        Connect.connect();
-        Connect.createProductTable();
+        Connect.connect("products");
+        Connect.connect("cart");
+        Connect.createProductTable("products");
+        Connect.createProductTable("cart");
         SpringApplication.run(Main.class, args);
     }
 

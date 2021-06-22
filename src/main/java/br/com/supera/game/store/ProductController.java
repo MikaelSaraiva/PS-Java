@@ -16,6 +16,19 @@ public class ProductController {
 		return "OK";
 	}
 
+	@GetMapping("/add")
+	public ArrayList<Product> addToCart(@RequestParam(value = "productId", defaultValue = "") String productId) {
+		Connect connection = new Connect();
+		ArrayList<Product> product = new ArrayList<Product>();
+		product = connection.selectProducts(productId);
+
+		if (!product.isEmpty()) {
+			connection.insertProduct("cart", product.get(0));
+		}
+
+		return connection.selectAll("cart");
+	}
+
 	interface Comparable {
 		public boolean compare(Product productA, Product productB);
 	}
@@ -89,9 +102,16 @@ public class ProductController {
 
 	@GetMapping("/sort")
 	public List<Product> sort(@RequestParam(value = "sortMethod", defaultValue = "name") String sortMethod,
-			@RequestParam(value = "order", defaultValue = "crescent") String order) {
+			@RequestParam(value = "order", defaultValue = "crescent") String order,
+			@RequestParam(value = "productIds", defaultValue = "") String productIds) {
 
-		ArrayList<Product> products = new Connect().selectAll();
+		ArrayList<Product> products;
+
+		if (productIds.length() == 0) {
+			products = new Connect().selectAll("products");
+		} else {
+			products = new Connect().selectProducts(productIds);
+		}
 
 		Comparable sorter;
 
