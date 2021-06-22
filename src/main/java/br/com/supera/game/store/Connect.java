@@ -75,12 +75,12 @@ public class Connect {
         }
     }
 
-    public void deleteProduct(String db, int id) {
-        String sql = "DELETE FROM " + db + " WHERE product.id = ?";
+    public void deleteProduct(String db, String id) {
+        String sql = "DELETE FROM " + db + " WHERE id = ?";
 
         try (Connection dbConnection = connect(db); PreparedStatement statement = dbConnection.prepareStatement(sql)) {
 
-            statement.setInt(1, id);
+            statement.setString(1, id);
             statement.executeUpdate();
 
         } catch (SQLException e) {

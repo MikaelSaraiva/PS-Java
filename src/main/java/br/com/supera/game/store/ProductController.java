@@ -29,6 +29,27 @@ public class ProductController {
 		return connection.selectAll("cart");
 	}
 
+	@GetMapping("/remove")
+	public ArrayList<Product> removeToCart(@RequestParam(value = "productId", defaultValue = "") String productId,
+			@RequestParam(value = "all", defaultValue = "false") Boolean all) {
+		Connect connection = new Connect();
+		ArrayList<Product> cart = new ArrayList<Product>();
+		cart = connection.selectAll("cart");
+
+		if (all) {
+			for (Product product : cart) {
+				connection.deleteProduct("cart", String.valueOf(product.id));
+			}
+			return connection.selectAll("cart");
+		}
+
+		if (!cart.isEmpty()) {
+			connection.deleteProduct("cart", productId);
+		}
+
+		return connection.selectAll("cart");
+	}
+
 	interface Comparable {
 		public boolean compare(Product productA, Product productB);
 	}
