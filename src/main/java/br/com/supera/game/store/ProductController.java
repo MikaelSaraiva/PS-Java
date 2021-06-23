@@ -1,9 +1,15 @@
 package br.com.supera.game.store;
 
+import org.json.JSONObject;
+
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.Collections;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,37 +23,147 @@ public class ProductController {
 	}
 
 	@GetMapping("/add")
-	public ArrayList<Product> addToCart(@RequestParam(value = "productId", defaultValue = "") String productId) {
+	public ResponseEntity<String> addToCart(@RequestParam(value = "productId", defaultValue = "") String productId,
+			@RequestParam(value = "cartId", defaultValue = "0") Long cartId) {
 		Connect connection = new Connect();
-		ArrayList<Product> product = new ArrayList<Product>();
-		product = connection.selectProducts(productId);
+		ArrayList<Product> products = new ArrayList<Product>();
+		products = connection.selectProducts(productId);
 
-		if (!product.isEmpty()) {
-			connection.insertProduct("cart", product.get(0));
+		if (cartId == 0) {
+			cartId = new Random().nextLong();
 		}
 
-		return connection.selectAll("cart");
+		JSONObject checkout = calculateCheckout(products);
+
+		if (!products.isEmpty()) {
+			connection.insertProducts(products, checkout, cartId);
+		}
+
+		JSONObject result = new JSONObject();
+		result.put("cartId", cartId);
+		result.put("products", convertProductToJsonString(products));
+		result.put("checkout", checkout);
+
+		return new ResponseEntity<String>(result.toString(), HttpStatus.OK);
 	}
 
 	@GetMapping("/remove")
-	public ArrayList<Product> removeToCart(@RequestParam(value = "productId", defaultValue = "") String productId,
-			@RequestParam(value = "all", defaultValue = "false") Boolean all) {
+	public ResponseEntity<String> removeToCart(@RequestParam(value = "productId", defaultValue = "") Long productId,
+			@RequestParam(value = "all", defaultValue = "false") Boolean all,
+			@RequestParam(value = "cartId", defaultValue = "0") Long cartId) {
 		Connect connection = new Connect();
-		ArrayList<Product> cart = new ArrayList<Product>();
-		cart = connection.selectAll("cart");
+		List<Product> products = new ArrayList<Product>();
+		JSONObject result = new JSONObject();
+		products = connection.selectCartProducts(cartId);
 
 		if (all) {
-			for (Product product : cart) {
-				connection.deleteProduct("cart", String.valueOf(product.id));
+			products = new ArrayList<Product>();
+		} else {
+			for (Product product : products) {
+				if (product.id == productId) {
+					products.remove(product);
+					break;
+				}
 			}
-			return connection.selectAll("cart");
 		}
 
-		if (!cart.isEmpty()) {
-			connection.deleteProduct("cart", productId);
+		JSONObject checkout = calculateCheckout(products);
+
+		result.put("cartId", cartId);
+		result.put("products", convertProductToJsonString(products));
+		result.put("checkout", checkout);
+
+		connection.updateCart(result);
+
+		return new ResponseEntity<String>(result.toString(), HttpStatus.OK);
+	}
+
+	@GetMapping("/checkout")
+	public ResponseEntity<String> checkout(@RequestParam(value = "cartId", defaultValue = "0") Long cartId) {
+		Connect connection = new Connect();
+		ArrayList<Product> cartProducts = new ArrayList<Product>();
+		cartProducts.addAll(connection.selectCartProducts(cartId));
+
+		JSONObject result = calculateCheckout(cartProducts);
+
+		return new ResponseEntity<String>(result.toString(), HttpStatus.OK);
+	}
+
+	@GetMapping("/sort")
+	public ResponseEntity<String> sort(@RequestParam(value = "sortMethod", defaultValue = "name") String sortMethod,
+			@RequestParam(value = "order", defaultValue = "crescent") String order,
+			@RequestParam(value = "productIds", defaultValue = "") String productIds) {
+
+		ArrayList<Product> products;
+
+		if (productIds.length() == 0) {
+			products = new Connect().selectAll();
+		} else {
+			products = new Connect().selectProducts(productIds);
 		}
 
-		return connection.selectAll("cart");
+		Comparable sorter;
+
+		switch (sortMethod) {
+
+			case ("price"):
+				sorter = new PriceGreaterThan();
+				break;
+
+			case ("score"):
+				sorter = new ScoreGreaterThan();
+				break;
+
+			default:
+				sorter = new SortZA();
+
+		}
+
+		List<Product> result = mergeSort(products, products.size(), sorter);
+
+		if (order.equals("decrescent")) {
+			Collections.reverse(result);
+		}
+
+		JSONObject resultJson = new JSONObject();
+		resultJson.put("products", convertProductToJsonString(result));
+
+		return new ResponseEntity<String>(resultJson.toString(), HttpStatus.OK);
+	}
+
+	public String convertProductToJsonString(List<Product> products) {
+		ArrayList<String> result = new ArrayList<String>();
+
+		for (Product product : products) {
+
+			result.add(product.getJson().toString());
+		}
+
+		return result.toString();
+	}
+
+	public JSONObject calculateCheckout(List<Product> products) {
+		BigDecimal total = new BigDecimal("0");
+		BigDecimal subtotal = new BigDecimal("0");
+		BigDecimal shipping = new BigDecimal("0");
+
+		for (Product product : products) {
+			if (subtotal.compareTo(new BigDecimal("250.0")) == -1) {
+				shipping.add(new BigDecimal(10));
+			} else if (subtotal.compareTo(new BigDecimal("250.0")) == 0) {
+				shipping = new BigDecimal("0");
+			}
+			subtotal.add(product.price);
+		}
+
+		total = subtotal.add(shipping);
+
+		JSONObject result = new JSONObject();
+		result.put("subtotal", subtotal);
+		result.put("shipping", shipping);
+		result.put("total", total);
+
+		return result;
 	}
 
 	interface Comparable {
@@ -121,42 +237,4 @@ public class ProductController {
 		return result;
 	}
 
-	@GetMapping("/sort")
-	public List<Product> sort(@RequestParam(value = "sortMethod", defaultValue = "name") String sortMethod,
-			@RequestParam(value = "order", defaultValue = "crescent") String order,
-			@RequestParam(value = "productIds", defaultValue = "") String productIds) {
-
-		ArrayList<Product> products;
-
-		if (productIds.length() == 0) {
-			products = new Connect().selectAll("products");
-		} else {
-			products = new Connect().selectProducts(productIds);
-		}
-
-		Comparable sorter;
-
-		switch (sortMethod) {
-
-			case ("price"):
-				sorter = new PriceGreaterThan();
-				break;
-
-			case ("score"):
-				sorter = new ScoreGreaterThan();
-				break;
-
-			default:
-				sorter = new SortZA();
-
-		}
-
-		List<Product> result = mergeSort(products, products.size(), sorter);
-
-		if (order.equals("decrescent")) {
-			Collections.reverse(result);
-		}
-
-		return result;
-	}
 }

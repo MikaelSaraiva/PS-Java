@@ -9,8 +9,8 @@ public class Main {
     public static void main(String[] args) {
         Connect.connect("products");
         Connect.connect("cart");
-        Connect.createProductTable("products");
-        Connect.createProductTable("cart");
+        Connect.createProductTable();
+        Connect.createCartTable();
         SpringApplication.run(Main.class, args);
     }
 
